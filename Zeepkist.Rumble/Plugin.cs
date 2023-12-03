@@ -26,6 +26,8 @@ namespace Zeepkist.Rumble
 
         // States
         static bool isOnTwoWheels { get; set; }
+        static bool isFirstPerson { get; set; }
+        static bool isDead { get; set; }
 
         private void Awake()
         {
@@ -33,7 +35,7 @@ namespace Zeepkist.Rumble
             harmony.PatchAll();
 
             // Plugin startup logic
-            Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+            Debug.Log($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
             Enable = Config.Bind<bool>("Mod", "Enable", true);
 
@@ -41,16 +43,32 @@ namespace Zeepkist.Rumble
                 .GetAssemblies()
                 .SingleOrDefault(assembly => assembly.GetName().Name.Equals(REWIRED_ASSEMBLY_NAME, StringComparison.OrdinalIgnoreCase));
             hasRewired = rewiredAssembly != null;
+            Debug.Log($"Found rewired assembly {REWIRED_ASSEMBLY_NAME} == {hasRewired}");
 
             RacingApi.Crashed += RacingApi_Crashed;
             RacingApi.PlayerSpawned += RacingApi_PlayerSpawned;
             RacingApi.PassedCheckpoint += RacingApi_PassedCheckpoint;
             RacingApi.WheelBroken += RacingApi_WheelBroken;
+
+            RacingApi.EnteredFirstPerson += RacingApi_EnteredFirstPerson;
+            RacingApi.EnteredThirdPerson += RacingApi_EnteredThirdPerson;
+        }
+
+        private void RacingApi_EnteredThirdPerson()
+        {
+            Debug.Log("Detected third person, setting isFirstPerson = false");
+            isFirstPerson = false;
+        }
+
+        private void RacingApi_EnteredFirstPerson()
+        {
+            Debug.Log("Detected first person, setting isFirstPerson = true");
+            isFirstPerson = true;
         }
 
         public void OnGUI()
         {
-            if (playerCar == null || Enable.Value == false)
+            if (playerCar == null || Enable.Value == false || hasRewired == false || isDead == true)
             {
                 return;
             }
@@ -63,7 +81,7 @@ namespace Zeepkist.Rumble
             isOnTwoWheels = playerCar.IsCarOnTwoWheels();
 
             // Detect when hitting ground hard
-            if (playerCar.localGForce.y > 3)
+            if (playerCar.localGForce.y > 2)
             {
                 float strength = playerCar.localGForce.y / 10;
                 if (strength > 1)
@@ -75,7 +93,7 @@ namespace Zeepkist.Rumble
             }
 
             // Detect when hitting something hard
-            if (playerCar.localGForce.x > 3)
+            if (playerCar.localGForce.x > 2)
             {
                 float strength = playerCar.localGForce.x / 10;
                 if (strength > 1)
@@ -86,12 +104,29 @@ namespace Zeepkist.Rumble
                 Rumble(strength, 0.2f);
             }
 
-            // Detect when wheels are slipping
-            bool isAnyWheelSlippingOrLocked = playerCar.wheels.Any(x => x.isSlipping || x.isWheelLock);
-            if (isAnyWheelSlippingOrLocked)
+            // Only run the following in 3rd person so 1st person doesnt get advantage
+            if (isFirstPerson == false)
             {
-                Debug.Log($"Detected a wheel slipping or locked");
-                Rumble(0.2f, 0.1f);
+                // Detect when wheels are slipping
+                bool isAnyWheelSlippingOrLocked = playerCar.wheels.Any(x => x.isSlipping || x.isWheelLock);
+                if (isAnyWheelSlippingOrLocked)
+                {
+                    Debug.Log($"Detected a wheel slipping or locked");
+                    Rumble(0.2f, 0.1f);
+                }
+
+                // Detect difference in surfaces and only going 50+ speed
+                // Multiple by 3.6 to get real speed
+                if (playerCar.GetLocalVelocity().magnitude * 3.6f > 50)
+                {
+                    var surfaces = playerCar.wheels.Select(x => x.GetCurrentSurface().physics.name).Distinct();
+                    if (surfaces.Count() > 1)
+                    {
+                        Debug.Log($"Detected two or more different surfaces --> {string.Join(',', surfaces)}");
+                        Rumble(0.1f, 0.1f);
+                    }
+                }
+
             }
         }
             
@@ -128,13 +163,16 @@ namespace Zeepkist.Rumble
         private void RacingApi_PlayerSpawned()
         {
             playerCar = PlayerManager.Instance.currentMaster.carSetups.First().cc;
+            isDead = false;
+            isFirstPerson = false;
 
-            Debug.Log($"Detected a player spawn");
+            Debug.Log($"Detected a player spawn, setting isDead = false and isFirstPerson = false");
             Rumble(.5f, .2f);
         }
 
         private void RacingApi_Crashed(CrashReason reason)
         {
+            isDead = true;
             Debug.Log($"Detected a crash");
             Rumble(1f, 1f);
         }
