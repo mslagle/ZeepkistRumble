@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Purchasing.MiniJSON;
+using ZeepSDK.Messaging;
 using ZeepSDK.Racing;
 using static Rewired.Demos.PressStartToJoinExample_Assigner;
 
@@ -17,7 +18,18 @@ namespace Zeepkist.Rumble
     {
         private Harmony harmony;
 
-        public static ConfigEntry<bool> Enable { get; private set; }
+        public static ConfigEntry<bool> EnableReason { get; private set; }
+        public static ConfigEntry<bool> EnableCrash { get; private set; }
+        public static ConfigEntry<bool> EnableWheel { get; private set; }
+        public static ConfigEntry<bool> EnableCheckpoint { get; private set; }
+        public static ConfigEntry<bool> EnableFinish { get; private set; }
+        public static ConfigEntry<bool> EnableSpawn { get; private set; }
+        public static ConfigEntry<bool> EnableTwoWheels { get; private set; }
+        public static ConfigEntry<bool> EnableGForce { get; private set; }
+        public static ConfigEntry<float> MinimumGForce { get; private set; }
+        public static ConfigEntry<float> MaximumGForce { get; private set; }
+        public static ConfigEntry<bool> EnableTireSmoke { get; private set; }
+        public static ConfigEntry<bool> EnableSurfaceChange { get; private set; }
 
         public static bool hasRewired { get; set; }
         const string REWIRED_ASSEMBLY_NAME = "Rewired_Core";
@@ -37,7 +49,33 @@ namespace Zeepkist.Rumble
             // Plugin startup logic
             Debug.Log($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
-            Enable = Config.Bind<bool>("Mod", "Enable", true);
+            EnableReason = Config.Bind<bool>("Mod", "Enable message for rumble reason", false);
+            EnableCrash = Config.Bind<bool>("Mod", "Enable for crash", true);
+            EnableWheel = Config.Bind<bool>("Mod", "Enable for wheel loss", true);
+            EnableFinish = Config.Bind<bool>("Mod", "Enable for finish", true);
+            EnableCheckpoint = Config.Bind<bool>("Mod", "Enable for checkpoint", true);
+            EnableSpawn = Config.Bind<bool>("Mod", "Enable for spawn", true);
+            EnableTwoWheels = Config.Bind<bool>("Mod", "Enable for two wheels", true);
+            EnableTireSmoke = Config.Bind<bool>("Mod", "Enable for tiresmoke (disabled in 1st person)", true, "Disabled in 1st person");
+            EnableSurfaceChange = Config.Bind<bool>("Mod", "Enable for surface changes (disabled in 1st person)", true, "Disabled in 1st person");
+
+            EnableGForce = Config.Bind<bool>("G Force", "Enable for high G force", true);
+            MinimumGForce = Config.Bind<float>("G Force", "Minimum G Force", 3);
+            MaximumGForce = Config.Bind<float>("G Force", "Maximum G Force", 10);
+
+            EnableReason.SettingChanged += SettingChanged;
+            EnableCrash.SettingChanged += SettingChanged;
+            EnableWheel.SettingChanged += SettingChanged;
+            EnableFinish.SettingChanged += SettingChanged;
+            EnableCheckpoint.SettingChanged += SettingChanged;
+            EnableSpawn.SettingChanged += SettingChanged;
+            EnableTwoWheels.SettingChanged += SettingChanged;
+            EnableTireSmoke.SettingChanged += SettingChanged;
+            EnableSurfaceChange.SettingChanged += SettingChanged;
+
+            EnableGForce.SettingChanged += SettingChanged;
+            MinimumGForce.SettingChanged += SettingChanged;
+            MaximumGForce.SettingChanged += SettingChanged;
 
             var rewiredAssembly = AppDomain.CurrentDomain
                 .GetAssemblies()
@@ -49,9 +87,31 @@ namespace Zeepkist.Rumble
             RacingApi.PlayerSpawned += RacingApi_PlayerSpawned;
             RacingApi.PassedCheckpoint += RacingApi_PassedCheckpoint;
             RacingApi.WheelBroken += RacingApi_WheelBroken;
+            RacingApi.CrossedFinishLine += RacingApi_CrossedFinishLine;
 
             RacingApi.EnteredFirstPerson += RacingApi_EnteredFirstPerson;
             RacingApi.EnteredThirdPerson += RacingApi_EnteredThirdPerson;
+        }
+
+        private void SettingChanged(object sender, EventArgs e)
+        {
+            var configObject = sender as ConfigEntryBase;
+
+            if (configObject != null)
+            {
+                Debug.Log($"Detected config change.  {configObject.Definition} = {configObject.BoxedValue}");
+            }
+        }
+
+        private void RacingApi_CrossedFinishLine(float time)
+        {
+            isDead = true;
+            Debug.Log($"Crossed Finish line {time}, setting isDead = true");
+
+            if (EnableCrash.Value)
+            {
+                Rumble(1f, 1f, "Finish");
+            }
         }
 
         private void RacingApi_EnteredThirdPerson()
@@ -68,40 +128,40 @@ namespace Zeepkist.Rumble
 
         public void OnGUI()
         {
-            if (playerCar == null || Enable.Value == false || hasRewired == false || isDead == true)
+            if (playerCar == null || hasRewired == false || isDead == true)
             {
                 return;
             }
 
             // Detect when coming off 2 wheels
-            if (isOnTwoWheels == true && playerCar.IsCarOnTwoWheels() == false) {
+            if (EnableTwoWheels.Value && isOnTwoWheels == true && playerCar.IsCarOnTwoWheels() == false) {
                 Debug.Log("Detected coming off 2 wheels, rumbling");
-                Rumble(0.25f, 0.1f);
+                Rumble(0.25f, 0.1f, "Two Wheels");
             }
             isOnTwoWheels = playerCar.IsCarOnTwoWheels();
 
             // Detect when hitting ground hard
-            if (playerCar.localGForce.y > 2)
+            if (EnableGForce.Value && playerCar.localGForce.y > MinimumGForce.Value)
             {
-                float strength = playerCar.localGForce.y / 10;
+                float strength = playerCar.localGForce.y / MaximumGForce.Value;
                 if (strength > 1)
                 {
                     strength = 1.0f;
                 }
                 Debug.Log($"Detected strong Y Gforce of {playerCar.localGForce.y} = {strength}");
-                Rumble(strength, 0.2f);
+                Rumble(strength, 0.2f, "G Force");
             }
 
             // Detect when hitting something hard
-            if (playerCar.localGForce.x > 2)
+            if (EnableGForce.Value && playerCar.localGForce.x > MinimumGForce.Value)
             {
-                float strength = playerCar.localGForce.x / 10;
+                float strength = playerCar.localGForce.x / MaximumGForce.Value;
                 if (strength > 1)
                 {
                     strength = 1.0f;
                 }
                 Debug.Log($"Detected strong X Gforce of {playerCar.localGForce.x} = {strength}");
-                Rumble(strength, 0.2f);
+                Rumble(strength, 0.2f, "G Force");
             }
 
             // Only run the following in 3rd person so 1st person doesnt get advantage
@@ -109,21 +169,21 @@ namespace Zeepkist.Rumble
             {
                 // Detect when wheels are slipping
                 bool isAnyWheelSlippingOrLocked = playerCar.wheels.Any(x => x.isSlipping || x.isWheelLock);
-                if (isAnyWheelSlippingOrLocked)
+                if (EnableTireSmoke.Value && isAnyWheelSlippingOrLocked)
                 {
                     Debug.Log($"Detected a wheel slipping or locked");
-                    Rumble(0.2f, 0.1f);
+                    Rumble(0.2f, 0.1f, "Wheel smoke");
                 }
 
                 // Detect difference in surfaces and only going 50+ speed
                 // Multiple by 3.6 to get real speed
-                if (playerCar.GetLocalVelocity().magnitude * 3.6f > 50)
+                if (EnableSurfaceChange.Value && playerCar.GetLocalVelocity().magnitude * 3.6f > 50)
                 {
                     var surfaces = playerCar.wheels.Select(x => x.GetCurrentSurface().physics.name).Distinct();
                     if (surfaces.Count() > 1)
                     {
                         Debug.Log($"Detected two or more different surfaces --> {string.Join(',', surfaces)}");
-                        Rumble(0.1f, 0.1f);
+                        Rumble(0.1f, 0.1f, "Surface change");
                     }
                 }
 
@@ -131,14 +191,13 @@ namespace Zeepkist.Rumble
         }
             
 
-        private void Rumble(float intensity, float length)
+        private void Rumble(float intensity, float length, string reason)
         {
-            if (Enable.Value == false)
+            if (EnableReason.Value)
             {
-                Debug.Log("Mod disabled, not rumbling!");
-                return;
+                PlayerManager.Instance.messenger.Log(reason, 1.0f);
             }
-
+            
             Debug.Log($"Rumbling with intensity = {intensity} and length = {length}");
             foreach (var joystick in Rewired.ReInput.players.AllPlayers.First().controllers.Joysticks)
             {
@@ -150,14 +209,20 @@ namespace Zeepkist.Rumble
 
         private void RacingApi_WheelBroken()
         {
-            Debug.Log($"Detected a broken wheel");
-            Rumble(1f, .5f);
+            if (EnableWheel.Value)
+            {
+                Debug.Log($"Detected a broken wheel");
+                Rumble(1f, .5f, "Broken Wheel");
+            }
         }
 
         private void RacingApi_PassedCheckpoint(float time)
         {
-            Debug.Log($"Detected passing a checkpoint");
-            Rumble(.5f, .1f);
+            if (EnableCheckpoint.Value)
+            {
+                Debug.Log($"Detected passing a checkpoint");
+                Rumble(.5f, .1f, "Checkpoint");
+            }
         }
 
         private void RacingApi_PlayerSpawned()
@@ -165,16 +230,24 @@ namespace Zeepkist.Rumble
             playerCar = PlayerManager.Instance.currentMaster.carSetups.First().cc;
             isDead = false;
             isFirstPerson = false;
-
             Debug.Log($"Detected a player spawn, setting isDead = false and isFirstPerson = false");
-            Rumble(.5f, .2f);
+
+            if (EnableSpawn.Value)
+            {
+                Rumble(.5f, .2f, "Player Spawn");
+            }
+
         }
 
         private void RacingApi_Crashed(CrashReason reason)
         {
             isDead = true;
-            Debug.Log($"Detected a crash");
-            Rumble(1f, 1f);
+            Debug.Log($"Detected a crash, setting isDead = true");
+
+            if (EnableCrash.Value)
+            {
+                Rumble(1f, 1f, "Crashed");
+            }
         }
 
         public void OnDestroy()
