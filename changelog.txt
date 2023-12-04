@@ -1,3 +1,4 @@
-- Added support for rumble when wheels on 2 or more surfaces
-- Disabled wheel smoke and surface rumbling when in 1st person
-- Disabled constant rumbling when dead
+- Added config to enable/disable per rumble type
+- Added config option to show why rumbling
+- Added keyboard/mouse support
+- Rumble when crossing finish line
