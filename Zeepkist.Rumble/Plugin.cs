@@ -29,7 +29,6 @@ namespace Zeepkist.Rumble
         public static ConfigEntry<float> MinimumGForce { get; private set; }
         public static ConfigEntry<float> MaximumGForce { get; private set; }
         public static ConfigEntry<bool> EnableTireSmoke { get; private set; }
-        public static ConfigEntry<bool> EnableSurfaceChange { get; private set; }
 
         public static bool hasRewired { get; set; }
         const string REWIRED_ASSEMBLY_NAME = "Rewired_Core";
@@ -57,7 +56,6 @@ namespace Zeepkist.Rumble
             EnableSpawn = Config.Bind<bool>("Mod", "Enable for spawn", true);
             EnableTwoWheels = Config.Bind<bool>("Mod", "Enable for two wheels", true);
             EnableTireSmoke = Config.Bind<bool>("Mod", "Enable for tiresmoke (disabled in 1st person)", true, "Disabled in 1st person");
-            EnableSurfaceChange = Config.Bind<bool>("Mod", "Enable for surface changes (disabled in 1st person)", true, "Disabled in 1st person");
 
             EnableGForce = Config.Bind<bool>("G Force", "Enable for high G force", true);
             MinimumGForce = Config.Bind<float>("G Force", "Minimum G Force", 3);
@@ -71,7 +69,6 @@ namespace Zeepkist.Rumble
             EnableSpawn.SettingChanged += SettingChanged;
             EnableTwoWheels.SettingChanged += SettingChanged;
             EnableTireSmoke.SettingChanged += SettingChanged;
-            EnableSurfaceChange.SettingChanged += SettingChanged;
 
             EnableGForce.SettingChanged += SettingChanged;
             MinimumGForce.SettingChanged += SettingChanged;
@@ -165,28 +162,15 @@ namespace Zeepkist.Rumble
             }
 
             // Only run the following in 3rd person so 1st person doesnt get advantage
-            if (isFirstPerson == false)
+            if (isFirstPerson == false && EnableTireSmoke.Value)
             {
                 // Detect when wheels are slipping
-                bool isAnyWheelSlippingOrLocked = playerCar.wheels.Any(x => x.isSlipping || x.isWheelLock);
-                if (EnableTireSmoke.Value && isAnyWheelSlippingOrLocked)
+                var wheelLocked = playerCar.wheels.FirstOrDefault(x => x.IsSlipping() && x.GetCurrentSurface().physics.frictionFront > .5);
+                if (wheelLocked != null)
                 {
-                    Debug.Log($"Detected a wheel slipping or locked");
-                    Rumble(0.2f, 0.1f, "Wheel smoke");
+                    Debug.Log($"Detected a wheel slipping on a hard surface {wheelLocked.name} on {wheelLocked.GetCurrentSurface().name}");
+                    Rumble(0.4f, 0.1f, "Wheel smoke");
                 }
-
-                // Detect difference in surfaces and only going 50+ speed
-                // Multiple by 3.6 to get real speed
-                if (EnableSurfaceChange.Value && playerCar.GetLocalVelocity().magnitude * 3.6f > 50)
-                {
-                    var surfaces = playerCar.wheels.Select(x => x.GetCurrentSurface().physics.name).Distinct();
-                    if (surfaces.Count() > 1)
-                    {
-                        Debug.Log($"Detected two or more different surfaces --> {string.Join(',', surfaces)}");
-                        Rumble(0.1f, 0.1f, "Surface change");
-                    }
-                }
-
             }
         }
             
