@@ -1,4 +1,2 @@
-- Added config to enable/disable per rumble type
-- Added config option to show why rumbling
-- Added keyboard/mouse support
-- Rumble when crossing finish line
+- Only rumble on hard surfaces like asphalt
+- Bring back the old kernkob
