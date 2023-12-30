@@ -1,2 +1,3 @@
-- Only rumble on hard surfaces like asphalt
+- Fix bug where tire smoke was still detected after jumping
+- Better performance with less logging
 - Bring back the old kernkob
