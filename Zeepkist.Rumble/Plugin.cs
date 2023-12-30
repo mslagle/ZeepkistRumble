@@ -123,7 +123,7 @@ namespace Zeepkist.Rumble
             isFirstPerson = true;
         }
 
-        public void OnGUI()
+        private void Update()
         {
             if (playerCar == null || hasRewired == false || isDead == true)
             {
@@ -165,7 +165,7 @@ namespace Zeepkist.Rumble
             if (isFirstPerson == false && EnableTireSmoke.Value)
             {
                 // Detect when wheels are slipping
-                var wheelLocked = playerCar.wheels.FirstOrDefault(x => x.IsSlipping() && x.GetCurrentSurface().physics.frictionFront > .5);
+                var wheelLocked = playerCar.wheels.FirstOrDefault(x => x.IsGrounded() && x.IsSlipping() && x.GetCurrentSurface().physics.frictionFront > .5);
                 if (wheelLocked != null)
                 {
                     Debug.Log($"Detected a wheel slipping on a hard surface {wheelLocked.name} on {wheelLocked.GetCurrentSurface().name}");
@@ -182,7 +182,7 @@ namespace Zeepkist.Rumble
                 PlayerManager.Instance.messenger.Log(reason, 1.0f);
             }
             
-            Debug.Log($"Rumbling with intensity = {intensity} and length = {length}");
+            //Debug.Log($"Rumbling with intensity = {intensity} and length = {length} due to {reason}");
             foreach (var joystick in Rewired.ReInput.players.AllPlayers.First().controllers.Joysticks)
             {
                 if (!joystick.enabled) continue;
