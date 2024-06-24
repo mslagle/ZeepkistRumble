@@ -1,3 +1,2 @@
-- Fix bug where tire smoke was still detected after jumping
-- Better performance with less logging
-- Bring back the old kernkob
+- I cant version correctly
+- v16 support

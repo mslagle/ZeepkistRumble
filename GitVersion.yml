@@ -1,5 +1,5 @@
 mode: Mainline
-next-version: 1.0.7
+next-version: 1.0.8
 branches:
   master:
     regex: (^main$|^origin\/main$)
