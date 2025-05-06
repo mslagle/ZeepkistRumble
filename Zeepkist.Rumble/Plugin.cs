@@ -4,10 +4,7 @@ using HarmonyLib;
 using System;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Purchasing.MiniJSON;
-using ZeepSDK.Messaging;
 using ZeepSDK.Racing;
-using static Rewired.Demos.PressStartToJoinExample_Assigner;
 
 namespace Zeepkist.Rumble
 {
@@ -165,11 +162,12 @@ namespace Zeepkist.Rumble
             if (isFirstPerson == false && EnableTireSmoke.Value)
             {
                 // Detect when wheels are slipping
-                var wheelLocked = playerCar.wheels.FirstOrDefault(x => x.IsGrounded() && x.IsSlipping() && x.GetCurrentSurface().physics.frictionFront > .5);
+                var wheelLocked = playerCar.wheels.FirstOrDefault(x => x.IsGrounded() && x.IsSlipping());
                 if (wheelLocked != null)
                 {
-                    Debug.Log($"Detected a wheel slipping on a hard surface {wheelLocked.name} on {wheelLocked.GetCurrentSurface().name}");
-                    Rumble(0.4f, 0.1f, "Wheel smoke");
+                    Debug.Log($"Detected a wheel slipping on a hard surface {wheelLocked.name} on {wheelLocked.GetCurrentSurface().name} with {wheelLocked.GetCurrentSurface().physics.frictionFront}");
+                    float rumbleIntensity = wheelLocked.GetCurrentSurface().physics.frictionFront / 1.5f;
+                    Rumble(rumbleIntensity, 0.1f, $"Wheel smoke - {wheelLocked.GetCurrentSurface().physics.frictionFront.ToString("0.00")}");
                 }
             }
         }
