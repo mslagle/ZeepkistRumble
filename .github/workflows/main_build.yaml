@@ -36,12 +36,14 @@ jobs:
         run: |
           Compress-Archive ./Zeepkist.Rumble/bin/Release/net472/package/* mod.zip
 
-      - name:  Upload to mod.io
-        uses: nickelc/upload-to-modio@v2.1.0
-        with:
-          token: ${{ secrets.MODIO_TOKEN }}
-          game: ${{ vars.GAME_ID }}
-          mod: ${{ vars.MOD_ID }}
-          path: mod.zip
-          version: ${{ env.GitVersion_MajorMinorPatch }}
-          changelog-path: changelog.txt
+      - name: Upload to mod.io
+        env:
+          MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
+          GAME_ID: ${{ vars.GAME_ID }}
+          MOD_ID: ${{ vars.MOD_ID }}
+        run: |
+          curl --fail-with-body "https://g-${GAME_ID}.modapi.io/v1/games/${GAME_ID}/mods/${MOD_ID}/files" \
+            -H "Authorization: Bearer $MODIO_TOKEN" \
+            -F "filedata=@mod.zip" \
+            -F "version=${{ steps.version.outputs.version }}" \
+            -F "changelog=<changelog.txt"
