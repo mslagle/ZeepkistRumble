@@ -37,6 +37,7 @@ jobs:
           Compress-Archive ./Zeepkist.Rumble/bin/Release/net472/package/* mod.zip
 
       - name: Upload to mod.io
+        shell: bash
         env:
           MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
           GAME_ID: ${{ vars.GAME_ID }}
@@ -45,5 +46,5 @@ jobs:
           curl --fail-with-body "https://g-${GAME_ID}.modapi.io/v1/games/${GAME_ID}/mods/${MOD_ID}/files" \
             -H "Authorization: Bearer $MODIO_TOKEN" \
             -F "filedata=@mod.zip" \
-            -F "version=${{ steps.version.outputs.version }}" \
+            -F "version=${{ steps.gitversion.outputs.semVer }}" \
             -F "changelog=<changelog.txt"
